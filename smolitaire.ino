@@ -1,44 +1,31 @@
 #include <Adafruit_GFX.h>
-#include <Adafruit_ST7735.h>
+#include <Adafruit_ST7789.h>
+#include <SPI.h>
 
 #include "Graphics.h"
 
-#define TFT_CS        1
-#define TFT_RST      -1   // The TFT's reset is tied to the Trinket's reset line
-#define TFT_DC        0
+#define TFT_CS       A5
+#define TFT_RST      -1
+#define TFT_DC       A4
 
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
-const uint8_t tftWidth = 160;
-const uint8_t tftHeight = 80;
+Adafruit_ST7789 lcd = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+const uint8_t lcdW = 240;
+const uint8_t lcdH = 240;
 
-uint8_t* screenBuffer;
-uint8_t* prevScreenBuffer;
-
-enum Suit {
-  HEART, DIAMOND, SPADE, CROSS
-};
+enum Suit { HEART, DIAMOND, SPADE, CLUB };
 
 unsigned long curMillis = 0;
 unsigned long prevMillis = 0;
 float delta = 0.0f;
 
-// The screen is redrawn when this is set
-// This is used to allow us to only draw static screens once without having to
-// refresh the buffer every frame
 bool redraw = true;
 
 void setup() {
-  tft.initR(INITR_MINI160x80);
-  tft.setRotation(3);
+  lcd.init(lcdW, lcdH);
+  lcd.setRotation(2);
 
-  screenBuffer = new uint8_t[tftHeight * tftWidth];
-  prevScreenBuffer = new uint8_t[tftHeight * tftWidth];
-  for (int y = 0; y < tftHeight; ++y) {
-    for (int x = 0; x < tftWidth; ++x) {
-      screenBuffer[y * tftWidth + x] = 0;
-      prevScreenBuffer[y * tftWidth + x] = 255;
-    }
-  }
+  pinMode(A3, OUTPUT);
+  digitalWrite(A3, HIGH);
 
   drawString("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 2, 3, 3);
   drawString("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 9, 2, 2);
@@ -46,45 +33,23 @@ void setup() {
   drawString("abcdefghijklmnopqrstuvwxyz", 3, 1, 12);
   drawString("0123456789.,!?'^$%&", 7, 1, 22);
 
-  drawSpriteRegion(Graphics::suitData, 2, 50, 29, 1, 84, 5, 5);
+  //drawSpriteRegion(Graphics::suitData, 2, 50, 29, 1, 84, 5, 5);
 }
 
 void loop() {
-  // Calculate the time between the last loop iteration and this one
-  curMillis = millis();
-  delta = (curMillis - prevMillis) / 1000.0f;
-  prevMillis = curMillis;
-
-  update();
-}
-
-void update() {
   draw();
 }
 
-uint8_t curColour = 0;
-// Draw all the pixels that changed from the last frame buffer to the TFT
 void draw() {
   if (!redraw) return;
 
-  for (int y = 0; y < tftHeight; ++y) {
-    for (int x = 0; x < tftWidth; ++x) {
-      curColour = screenBuffer[y * tftWidth + x];
-      if (curColour != prevScreenBuffer[y * tftWidth + x]) {
-        tft.drawPixel(x, y, Graphics::palette[curColour]);
-      }
-    }
-  }
-
-  // Swap the screen buffers
-  uint8_t* temp = prevScreenBuffer;
-  prevScreenBuffer = screenBuffer;
-  screenBuffer = temp;
+  // TODO: drawing routine
 
   // Confirm the draw by resetting the redraw flag
   redraw = false;
 }
 
+/*
 void drawCard(byte x, byte y, uint8_t value, Suit suit) {
   // Draw card background
   for (int v = 0; v < Graphics::cardHeight; ++v) {
@@ -132,8 +97,9 @@ void drawSpriteRegion(const uint8_t* indices, byte x, byte y,
     }
   }
 }
+*/
 
-void drawString(char* str, uint8_t colour, byte x, byte y) {
+void drawString(const char* str, uint8_t colour, byte x, byte y) {
   char c;
   uint index = 0;
   while (1) {
@@ -145,7 +111,7 @@ void drawString(char* str, uint8_t colour, byte x, byte y) {
   }
 }
 
-byte drawChar(char c, uint8_t colour, byte x, byte y) {
+uint8_t drawChar(char c, uint8_t colour, uint8_t x, uint8_t y) {
   uint data_x = 0;
   uint data_y = 0;
   uint width = 0;
@@ -195,22 +161,10 @@ byte drawChar(char c, uint8_t colour, byte x, byte y) {
     for (int h = 0; h < width; ++h) {
       if (Graphics::fontData[
         (v + data_y) * Graphics::fontDataWidth + h + data_x] > 0) {
-        drawPixel(x + h, y + v + baselineOffset, colour);
+        lcd.drawPixel(x + h, y + v + baselineOffset,
+          Graphics::palette[colour]);
       }
     }
   }
   return width;
-}
-
-// Fill the screen buffer with a colour
-void fill(uint8_t colour) {
-  for (int y = 0; y < tftHeight; ++y) {
-    for (int x = 0; x < tftWidth; ++x) {
-      drawPixel(x, y, colour);
-    }
-  }
-}
-
-void drawPixel(byte x, byte y, uint8_t colour) {
-  screenBuffer[y * tftWidth + x] = colour;
 }
